@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>GymTracker Final</title>
+  <title>GymTracker 6.0 PR Edition</title>
   <style>
     :root{
       --bg:#0f172a; --card-bg: #1e293b; --text:#e2e8f0; --muted:#94a3b8;
@@ -58,10 +58,13 @@
 
     /* STYLES */
     .profile-header { padding: 20px; background: linear-gradient(180deg, rgba(59,130,246,0.15) 0%, rgba(0,0,0,0) 100%); text-align: center; border-bottom: 1px solid #333; }
+    .rank-icon { font-size: 40px; margin-bottom: 5px; display: block; animation: bounce 2s infinite; }
     .rank-title { font-size: 20px; font-weight: 800; color: var(--gold); }
     .xp-bar-container { background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; margin: 10px 0 5px; overflow: hidden; }
     .xp-bar-fill { background: var(--gold); height: 100%; width: 0%; transition: width 0.5s ease; }
     
+    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
     .menu-scroll { flex: 1; overflow-y: auto; padding: 16px; }
     .menu-btn { width: 100%; background: rgba(255,255,255,0.05); border:none; padding: 12px; color: #fff; text-align: left; margin-bottom: 8px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; }
     .menu-btn:hover { background: rgba(255,255,255,0.1); }
@@ -85,10 +88,24 @@
     }
     .note-area:focus { border-color: var(--accent); color: #fff; outline:none; }
     
-    .set-row { display: grid; grid-template-columns: 30px 1fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); }
+    /* Zmiana układu wiersza serii pod PR */
+    .set-row { display: grid; grid-template-columns: 25px 1fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); position: relative;}
     .set-row.done { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); }
     .check-btn { width: 40px; height: 40px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: var(--muted); font-size: 18px; cursor: pointer; }
     .check-btn.checked { background: var(--success); color: white; }
+
+    .pr-badge {
+      position: absolute; right: 50px; top: -8px;
+      background: var(--gold); color: #000;
+      font-size: 10px; font-weight: 900;
+      padding: 2px 6px; border-radius: 10px;
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+      animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      display: none; /* Domyślnie ukryte */
+    }
+    .pr-badge.show { display: block; }
+    
+    @keyframes pop { from{transform:scale(0)} to{transform:scale(1)} }
 
     /* TIMER */
     .timer-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: #0f172a; border-top: 2px solid var(--accent); padding: 16px; z-index: 100; display: flex; align-items: center; justify-content: space-between; transform: translateY(100%); transition: transform 0.3s; }
@@ -116,7 +133,7 @@
 
 <div class="sidebar" id="sidebar">
   <div class="profile-header">
-    <div style="font-size:32px">🥋</div>
+    <span class="rank-icon" id="rankIcon">🐣</span>
     <div class="rank-title" id="rankName">Świeżak</div>
     <div class="xp-bar-container"><div class="xp-bar-fill" id="xpBar"></div></div>
     <div style="font-size:12px; color:var(--muted)">Do awansu: <span id="nextRankTarget">0</span> kg</div>
@@ -228,6 +245,7 @@
 
 <template id="setRowTemplate">
   <div class="set-row">
+    <span class="pr-badge">🏆 REKORD!</span>
     <div style="color:var(--muted); font-size:12px; text-align:center" data-role="idx">1</div>
     <input type="number" class="input" data-role="weight" placeholder="kg">
     <input type="number" class="input" data-role="reps" placeholder="powt">
@@ -237,29 +255,29 @@
 
 <script>
 // --- ZMIENNE GLOBALNE ---
-const STORAGE_KEY = 'eryk_gym_final_v4';
+const STORAGE_KEY = 'eryk_gym_final_v6';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 let timerInt = null;
 let timeLeft = 120;
 
-// RANGI (Twoje 15 poziomów)
+// RANGI
 const RANKS = [
-  { name: 'Świeżak', min: 0 },
-  { name: 'Debiutant', min: 5000 },
-  { name: 'Początkujący', min: 15000 },
-  { name: 'Bywalec', min: 30000 },
-  { name: 'Zapaleniec', min: 60000 },
-  { name: 'Amator', min: 100000 },
-  { name: 'Pasjonat', min: 200000 },
-  { name: 'Średniozaawansowany', min: 350000 },
-  { name: 'Koks', min: 500000 },
-  { name: 'Kulturysta', min: 750000 },
-  { name: 'Dzik', min: 1000000 },
-  { name: 'Bestia', min: 1500000 },
-  { name: 'Goliat', min: 2500000 },
-  { name: 'Tytan', min: 3500000 },
-  { name: 'Król Żelastwa', min: 5000000 }
+  { name: 'Świeżak', min: 0, icon: '🐣' },
+  { name: 'Debiutant', min: 5000, icon: '👶' },
+  { name: 'Początkujący', min: 15000, icon: '🚶' },
+  { name: 'Bywalec', min: 30000, icon: '🏃' },
+  { name: 'Zapaleniec', min: 60000, icon: '🔥' },
+  { name: 'Amator', min: 100000, icon: '🥉' },
+  { name: 'Pasjonat', min: 200000, icon: '🥈' },
+  { name: 'Średniozaawansowany', min: 350000, icon: '🥇' },
+  { name: 'Koks', min: 500000, icon: '💊' },
+  { name: 'Kulturysta', min: 750000, icon: '🏋️' },
+  { name: 'Dzik', min: 1000000, icon: '🐗' },
+  { name: 'Bestia', min: 1500000, icon: '🦍' },
+  { name: 'Goliat', min: 2500000, icon: '👹' },
+  { name: 'Tytan', min: 3500000, icon: '🗿' },
+  { name: 'Król Żelastwa', min: 5000000, icon: '👑' }
 ];
 
 // --- OBSŁUGA DANYCH ---
@@ -280,7 +298,7 @@ function saveData(data) {
   calcGamification();
 }
 
-// --- FUNKCJE UI (MENU I MODALE) ---
+// --- FUNKCJE UI ---
 function toggleSidebar() { 
   $('#sidebar').classList.add('open'); 
   $('#overlay').classList.add('open');
@@ -301,6 +319,27 @@ function openModal(id) {
   if(m) m.classList.add('open');
   if(id === 'chartModal') initChartSelect();
   if(id === 'weightModal') renderWeightUI();
+}
+
+// --- LOGIKA PR (REKORDY) ---
+function getBestVolume(exerciseName) {
+  if(!exerciseName) return 0;
+  const d = loadData();
+  let maxVol = 0;
+  
+  Object.values(d.days).forEach(day => {
+    if(day.exercises) {
+      day.exercises.forEach(ex => {
+        if(ex.name === exerciseName) {
+          ex.sets.forEach(s => {
+            let vol = (Number(s.weight)||0) * (Number(s.reps)||0);
+            if(vol > maxVol) maxVol = vol;
+          });
+        }
+      });
+    }
+  });
+  return maxVol;
 }
 
 // --- LOGIKA ĆWICZEŃ ---
@@ -330,12 +369,17 @@ function addExerciseElement(name='', sets=[]) {
   const data = loadData();
   if(name && data.notes[name]) noteInput.value = data.notes[name];
 
-  noteInput.addEventListener('input', () => {
+  // Pobierz najlepszy wynik historyczny przy starcie
+  let historicalMax = getBestVolume(name);
+
+  // Aktualizacja rekordu przy zmianie nazwy
+  nameInput.addEventListener('input', () => {
     const n = nameInput.value.trim();
     if(n) {
       const d = loadData();
       d.notes[n] = noteInput.value;
       saveData(d);
+      historicalMax = getBestVolume(n); // Odśwież PR
     }
   });
   
@@ -345,10 +389,30 @@ function addExerciseElement(name='', sets=[]) {
     const sTpl = $('#setRowTemplate').content.cloneNode(true);
     const row = sTpl.querySelector('.set-row');
     const checkBtn = row.querySelector('[data-role="check"]');
+    const wInput = row.querySelector('[data-role="weight"]');
+    const rInput = row.querySelector('[data-role="reps"]');
+    const prBadge = row.querySelector('.pr-badge');
+
+    wInput.value = w;
+    rInput.value = r;
     
-    row.querySelector('[data-role="weight"]').value = w;
-    row.querySelector('[data-role="reps"]').value = r;
+    // Sprawdzenie PR na żywo
+    const checkPR = () => {
+      const vol = (Number(wInput.value)||0) * (Number(rInput.value)||0);
+      if(vol > 0 && vol > historicalMax) {
+        prBadge.classList.add('show');
+      } else {
+        prBadge.classList.remove('show');
+      }
+    };
     
+    // Uruchom sprawdzanie przy wpisywaniu
+    wInput.addEventListener('input', checkPR);
+    rInput.addEventListener('input', checkPR);
+    
+    // Sprawdź od razu przy ładowaniu
+    checkPR();
+
     if(isDone) { row.classList.add('done'); checkBtn.classList.add('checked'); }
     
     checkBtn.onclick = () => {
@@ -395,13 +459,13 @@ function collectCurrentData() {
   return { dayType: $('#dayTypeInput').value, exercises };
 }
 
-// --- OBSŁUGA PRZYCISKÓW (ZDARZENIA) ---
+// --- ZAPIS ---
 $('#saveBtn').onclick = () => {
   const date = $('#dateInput').value;
   const data = loadData();
   data.days[date] = collectCurrentData();
   saveData(data);
-  alert('Zapisano!');
+  alert('Zapisano! Punkty dodane.');
 };
 
 $('#addExerciseBtn').onclick = () => addExerciseElement();
@@ -427,7 +491,13 @@ function calcGamification() {
   allDates.forEach(d => {
     if(data.days[d] && data.days[d].exercises) {
       data.days[d].exercises.forEach(ex => {
-        ex.sets.forEach(s => totalVol += (Number(s.weight||0)*Number(s.reps||0)));
+        ex.sets.forEach(s => {
+          let w = Number(s.weight || 0);
+          let r = Number(s.reps || 0);
+          // FIX KALISTENIKI: 0kg -> 40kg
+          if(w === 0 && r > 0) w = 40; 
+          totalVol += (w * r);
+        });
       });
     }
   });
@@ -453,7 +523,9 @@ function calcGamification() {
   }
 
   $('#rankName').textContent = currentRank.name;
+  $('#rankIcon').textContent = currentRank.icon;
   $('#streakCount').textContent = streak;
+  
   const xpPerc = Math.min(100, Math.max(0, ((totalVol-currentRank.min)/(nextRank.min-currentRank.min))*100));
   $('#xpBar').style.width = xpPerc + '%';
   $('#nextRankTarget').textContent = (nextRank.min - totalVol).toLocaleString();
@@ -477,7 +549,7 @@ function renderSidebarHistory() {
   });
 }
 
-// --- TIMER I DODATKI ---
+// --- TIMER, IMPORT, EXPORT ---
 function startAutoTimer() {
   clearInterval(timerInt); timeLeft=120;
   $('#timerBar').classList.add('active'); updateTimer();
