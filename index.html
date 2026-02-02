@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>GymTracker Ultimate</title>
+  <title>GymTracker Final</title>
   <style>
     :root{
       --bg:#0f172a; --card-bg: #1e293b; --text:#e2e8f0; --muted:#94a3b8;
@@ -14,16 +14,18 @@
     *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
     
     body{
-      margin:0; font-family:'Segoe UI', system-ui, sans-serif;
+      margin:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: var(--bg); color:var(--text);
-      padding-bottom: 120px; overflow-x: hidden;
+      /* Extra padding for iPhone bottom bar */
+      padding-bottom: 140px; 
+      overflow-x: hidden;
     }
 
-    /* ERROR BAR */
+    /* DEBUG BAR (Tylko w razie awarii) */
     #debug-bar {
-      display: none; background: #7f1d1d; color: #fff; padding: 10px;
+      display: none; background: #7f1d1d; color: #fff; padding: 15px;
       font-size: 12px; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999;
-      border-bottom: 2px solid #ef4444;
+      border-bottom: 2px solid #ef4444; white-space: pre-wrap;
     }
 
     /* MENU & MODALS */
@@ -31,7 +33,7 @@
       position: fixed; top:0; left:0; width:100%; height:100%;
       background: rgba(0,0,0,0.8); z-index: 900;
       opacity: 0; pointer-events: none; transition: 0.3s;
-      backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     }
     .menu-overlay.open { opacity: 1; pointer-events: all; }
 
@@ -46,7 +48,7 @@
     .sidebar.open { transform: translateX(100%); }
 
     .modal {
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.95);
       width: 90%; max-width: 400px; max-height: 85vh;
       background: #1e293b; border-radius: 16px; z-index: 1100;
       padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.7);
@@ -54,44 +56,49 @@
       border: 1px solid rgba(255,255,255,0.1); overflow-y: auto;
     }
     .modal.open { opacity: 1; pointer-events: all; transform: translate(-50%, -50%) scale(1); }
-    .modal-close { position: absolute; top: 10px; right: 10px; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer;}
+    .modal-close { position: absolute; top: 10px; right: 10px; background:none; border:none; color:var(--muted); font-size:24px; cursor:pointer; padding: 5px;}
 
     /* STYLES */
-    .profile-header { padding: 20px; background: linear-gradient(180deg, rgba(59,130,246,0.15) 0%, rgba(0,0,0,0) 100%); text-align: center; border-bottom: 1px solid #333; }
-    .rank-title { font-size: 20px; font-weight: 800; color: var(--gold); }
+    .profile-header { padding: 30px 20px; background: linear-gradient(180deg, rgba(59,130,246,0.15) 0%, rgba(0,0,0,0) 100%); text-align: center; border-bottom: 1px solid #333; }
+    .rank-title { font-size: 22px; font-weight: 800; color: var(--gold); margin: 5px 0; }
     .xp-bar-container { background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; margin: 10px 0 5px; overflow: hidden; }
     .xp-bar-fill { background: var(--gold); height: 100%; width: 0%; transition: width 0.5s ease; }
     
-    .menu-scroll { flex: 1; overflow-y: auto; padding: 16px; }
-    .menu-btn { width: 100%; background: rgba(255,255,255,0.05); border:none; padding: 12px; color: #fff; text-align: left; margin-bottom: 8px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; }
-    .menu-btn:hover { background: rgba(255,255,255,0.1); }
+    .menu-scroll { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+    .menu-btn { width: 100%; background: rgba(255,255,255,0.05); border:none; padding: 14px; color: #fff; text-align: left; margin-bottom: 8px; border-radius: 10px; display: flex; align-items: center; gap: 12px; font-size: 16px; cursor: pointer; }
     
     .app { max-width: 800px; margin: 0 auto; padding: 16px; transition: 0.3s; }
     .card { background: var(--card-bg); border-radius: 16px; padding: 16px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05); }
     
-    .input { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 10px; width: 100%; font-size: 16px; }
-    .btn { padding: 12px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .input { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 14px; border-radius: 12px; width: 100%; font-size: 16px; -webkit-appearance: none; }
+    .btn { padding: 14px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; }
     .btn.primary { background: var(--accent); color: white; }
     .btn.success { background: var(--success); color: #003311; }
     .btn.ghost { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.1); }
     .btn.danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 
-    /* EXERCISE & NOTES */
-    .exercise { background: #26334d; border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+    /* EXERCISE */
+    .exercise { background: #26334d; border-radius: 16px; padding: 16px; margin-bottom: 16px; }
     .note-area {
       width: 100%; background: rgba(0,0,0,0.2); border: 1px dashed rgba(255,255,255,0.1);
-      color: var(--muted); font-size: 13px; padding: 8px; border-radius: 8px;
-      margin-top: 8px; resize: none; font-family: inherit;
+      color: var(--muted); font-size: 14px; padding: 10px; border-radius: 8px;
+      margin-top: 10px; resize: none; font-family: inherit;
     }
-    .note-area:focus { border-color: var(--accent); color: #fff; outline:none; }
     
-    .set-row { display: grid; grid-template-columns: 30px 1fr 1fr 40px; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); }
+    .set-row { display: grid; grid-template-columns: 30px 1fr 1fr 44px; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; border-radius: 10px; background: rgba(0,0,0,0.2); }
     .set-row.done { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); }
-    .check-btn { width: 40px; height: 40px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: var(--muted); font-size: 18px; cursor: pointer; }
+    .check-btn { width: 44px; height: 44px; border-radius: 10px; border: none; background: rgba(255,255,255,0.1); color: var(--muted); font-size: 20px; cursor: pointer; display:grid; place-items:center; }
     .check-btn.checked { background: var(--success); color: white; }
 
     /* TIMER */
-    .timer-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: #0f172a; border-top: 2px solid var(--accent); padding: 16px; z-index: 100; display: flex; align-items: center; justify-content: space-between; transform: translateY(100%); transition: transform 0.3s; }
+    .timer-bar { 
+      position: fixed; bottom: 0; left: 0; width: 100%; 
+      background: #0f172a; border-top: 2px solid var(--accent); 
+      /* iPhone padding fix */
+      padding: 16px 16px 30px 16px; 
+      z-index: 100; display: flex; align-items: center; justify-content: space-between; 
+      transform: translateY(100%); transition: transform 0.3s; 
+    }
     .timer-bar.active { transform: translateY(0); }
     .timer-big { font-family: monospace; font-size: 32px; font-weight: bold; color: white; }
 
@@ -103,14 +110,14 @@
     
     .row { display: flex; gap: 10px; align-items: center; }
     .space-between { justify-content: space-between; }
-    .history-item { padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;}
-    .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left:5px;}
+    .history-item { padding: 12px; background: rgba(255,255,255,0.05); border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;}
+    .tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-left:6px;}
     .tag.PUSH{background:var(--push)} .tag.PULL{background:var(--pull)} .tag.LEGS{background:var(--legs)}
   </style>
 </head>
 <body>
 
-<div id="debug-bar">Błąd aplikacji. Zrób screena i pokaż Erykowi. <span id="debug-msg"></span></div>
+<div id="debug-bar">Błąd. Zrób screena: <span id="debug-msg"></span></div>
 
 <div class="menu-overlay" id="overlay" onclick="closeAll()"></div>
 
@@ -134,9 +141,15 @@
     <div style="color:var(--muted); font-size:11px; margin:16px 0 8px; text-transform:uppercase">Historia</div>
     <div id="sidebarHistoryList"></div>
     
-    <button class="btn ghost" style="width:100%; margin-top:20px" onclick="exportData()">Eksport JSON</button>
+    <div style="border-top:1px solid rgba(255,255,255,0.1); margin-top:20px; padding-top:20px">
+      <button class="btn ghost" style="width:100%" onclick="exportData()">📤 Eksport (Kopia)</button>
+      <div style="height:10px"></div>
+      <button class="btn ghost" style="width:100%; border-color:var(--warn); color:var(--warn)" onclick="document.getElementById('importFile').click()">📥 Importuj Dane</button>
+    </div>
   </div>
 </div>
+
+<input type="file" id="importFile" style="display:none" onchange="importData(this)" accept=".json">
 
 <div class="modal" id="chartModal">
   <button class="modal-close" onclick="closeAll()">✕</button>
@@ -144,7 +157,7 @@
   <select id="chartExerciseSelect" class="input" onchange="renderChart(this.value)">
     <option value="">Wybierz ćwiczenie...</option>
   </select>
-  <div id="chartWrapper" style="text-align:center; margin-top:20px; color:var(--muted); height:200px">
+  <div id="chartWrapper" style="text-align:center; margin-top:20px; color:var(--muted); height:200px; display:grid; place-items:center">
     Wybierz ćwiczenie powyżej
   </div>
 </div>
@@ -181,7 +194,7 @@
   <div class="card">
     <div class="row" style="gap:8px">
       <input type="date" id="dateInput" class="input" style="flex:2">
-      <select id="dayTypeInput" class="input" style="flex:1.5; padding: 12px 4px;">
+      <select id="dayTypeInput" class="input" style="flex:1.5; padding: 14px 4px;">
         <option value="PUSH">PUSH</option>
         <option value="PULL">PULL</option>
         <option value="LEGS">LEGS</option>
@@ -212,7 +225,7 @@
   <div class="exercise">
     <div class="row space-between" style="margin-bottom:5px">
       <input class="input" data-role="name" placeholder="Nazwa ćwiczenia..." style="font-weight:bold; border:none; padding:8px 0; border-radius:0; border-bottom:1px solid #ffffff20; background:transparent">
-      <button class="btn ghost" data-role="removeEx" style="color:var(--danger)">✕</button>
+      <button class="btn ghost" data-role="removeEx" style="color:var(--danger); padding:5px 10px;">✕</button>
     </div>
     <textarea class="note-area" data-role="note" placeholder="Notatka / Ustawienia maszyny..." rows="1"></textarea>
     <div class="sets-container" data-role="sets" style="margin-top:10px"></div>
@@ -235,30 +248,21 @@ window.onerror = function(msg, url, line) {
   document.getElementById('debug-msg').textContent = msg + " (Line: " + line + ")";
 };
 
+// GŁÓWNA LOGIKA BEZ SKRÓTÓW TYPU $ CZY $$
 try {
-  const STORAGE_KEY = 'eryk_gym_v4_fix';
-  const $ = (s) => document.querySelector(s);
-  const $$ = (s) => document.querySelectorAll(s);
-
-    // RANGI - 15 POZIOMÓW (MAX 5 MLN KG)
+  const STORAGE_KEY = 'eryk_gym_final';
+  
+  // RANGI
   const RANKS = [
-    { name: 'Świeżak', min: 0 },                  // Start
-    { name: 'Debiutant', min: 5000 },             // 5 ton
-    { name: 'Początkujący', min: 15000 },         // 15 ton
-    { name: 'Bywalec', min: 30000 },              // 30 ton
-    { name: 'Zapaleniec', min: 60000 },           // 60 ton
-    { name: 'Amator', min: 100000 },              // 100 ton
-    { name: 'Pasjonat', min: 200000 },            // 200 ton
-    { name: 'Średniozaawansowany', min: 350000 }, // 350 ton
-    { name: 'Koks', min: 500000 },                // 500 ton (Pół miliona)
-    { name: 'Kulturysta', min: 750000 },          // 750 ton
-    { name: 'Dzik', min: 1000000 },               // 1 MLN kg (Legenda)
-    { name: 'Bestia', min: 1500000 },             // 1.5 MLN
-    { name: 'Goliat', min: 2500000 },             // 2.5 MLN
-    { name: 'Tytan', min: 3500000 },              // 3.5 MLN
-    { name: 'Król Żelastwa', min: 5000000 }       // 5 MLN (MAX)
+    { name: 'Świeżak', min: 0 }, { name: 'Debiutant', min: 5000 },
+    { name: 'Początkujący', min: 15000 }, { name: 'Bywalec', min: 30000 },
+    { name: 'Zapaleniec', min: 60000 }, { name: 'Amator', min: 100000 },
+    { name: 'Pasjonat', min: 200000 }, { name: 'Średniozaawansowany', min: 350000 },
+    { name: 'Koks', min: 500000 }, { name: 'Kulturysta', min: 750000 },
+    { name: 'Dzik', min: 1000000 }, { name: 'Bestia', min: 1500000 },
+    { name: 'Goliat', min: 2500000 }, { name: 'Tytan', min: 3500000 },
+    { name: 'Król Żelastwa', min: 5000000 }
   ];
-
 
   function loadData() {
     try {
@@ -267,51 +271,52 @@ try {
       if(!d.notes) d.notes = {};
       if(!d.weightHistory) d.weightHistory = [];
       return d;
-    } catch(e) {
-      return { days: {}, notes: {}, weightHistory: [] };
-    }
+    } catch(e) { return { days: {}, notes: {}, weightHistory: [] }; }
   }
   function saveData(data) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     calcGamification();
   }
 
-  function toggleSidebar() { 
-    $('#sidebar').classList.add('open'); 
-    $('#overlay').classList.add('open');
+  // --- UI ---
+  window.toggleSidebar = function() { 
+    document.getElementById('sidebar').classList.add('open'); 
+    document.getElementById('overlay').classList.add('open');
     renderSidebarHistory(); 
     calcGamification();
   }
-  function closeAll() {
-    $('#sidebar').classList.remove('open');
-    $('#overlay').classList.remove('open');
-    $$('.modal').forEach(m => m.classList.remove('open'));
+  window.closeAll = function() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('open');
+    document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
   }
   window.openModal = function(id) {
-    closeAll();
-    $('#overlay').classList.add('open');
+    window.closeAll();
+    document.getElementById('overlay').classList.add('open');
     const m = document.getElementById(id);
     if(m) m.classList.add('open');
     if(id === 'chartModal') initChartSelect();
     if(id === 'weightModal') renderWeightUI();
   }
 
-  function loadDay(date) {
-    $('#dateInput').value = date;
+  // --- EXERCISES ---
+  window.loadDay = function(date) {
+    document.getElementById('dateInput').value = date;
     const data = loadData();
     const dayData = data.days[date];
-    $('#exercisesList').innerHTML = '';
+    const list = document.getElementById('exercisesList');
+    list.innerHTML = '';
     
     if(dayData) {
-      $('#dayTypeInput').value = dayData.dayType;
+      document.getElementById('dayTypeInput').value = dayData.dayType;
       dayData.exercises.forEach(ex => addExerciseElement(ex.name, ex.sets));
     }
   }
 
-  function addExerciseElement(name='', sets=[]) {
-    const tpl = $('#exerciseTemplate').content.cloneNode(true);
+  window.addExerciseElement = function(name='', sets=[]) {
+    const tpl = document.getElementById('exerciseTemplate').content.cloneNode(true);
     const el = tpl.querySelector('.exercise');
-    $('#exercisesList').appendChild(el);
+    document.getElementById('exercisesList').appendChild(el);
 
     const nameInput = el.querySelector('[data-role="name"]');
     const noteInput = el.querySelector('[data-role="note"]');
@@ -320,7 +325,7 @@ try {
     const data = loadData();
     if(name && data.notes[name]) noteInput.value = data.notes[name];
 
-    noteInput.addEventListener('input', () => {
+    noteInput.addEventListener('input', function() {
       const n = nameInput.value.trim();
       if(n) {
         const d = loadData();
@@ -331,8 +336,8 @@ try {
     
     const setsContainer = el.querySelector('[data-role="sets"]');
     
-    const renderSet = (w='', r='', isDone=false) => {
-      const sTpl = $('#setRowTemplate').content.cloneNode(true);
+    function renderSet(w='', r='', isDone=false) {
+      const sTpl = document.getElementById('setRowTemplate').content.cloneNode(true);
       const row = sTpl.querySelector('.set-row');
       const checkBtn = row.querySelector('[data-role="check"]');
       
@@ -341,24 +346,29 @@ try {
       
       if(isDone) { row.classList.add('done'); checkBtn.classList.add('checked'); }
       
-      checkBtn.onclick = () => {
+      checkBtn.onclick = function() {
         const nowDone = row.classList.toggle('done');
         checkBtn.classList.toggle('checked');
-        if(nowDone) startAutoTimer();
+        if(nowDone) window.startAutoTimer();
       };
       
+      const idxEl = row.querySelector('[data-role="idx"]'); 
       setsContainer.appendChild(row);
       updateIndices(setsContainer);
-    };
+      
+      // Swipe to delete logic could be here, but using button for simplicity
+    }
 
     if(sets.length) sets.forEach(s => renderSet(s.weight, s.reps, s.done));
     else for(let i=0;i<3;i++) renderSet();
 
-    el.querySelector('[data-role="addSet"]').onclick = () => {
+    el.querySelector('[data-role="addSet"]').onclick = function() {
        const last = setsContainer.lastElementChild;
        renderSet(last ? last.querySelector('[data-role="weight"]').value : '', '');
     };
-    el.querySelector('[data-role="removeEx"]').onclick = () => { if(confirm('Usunąć?')) el.remove(); };
+    el.querySelector('[data-role="removeEx"]').onclick = function() { 
+      if(confirm('Usunąć ćwiczenie?')) el.remove(); 
+    };
   }
 
   function updateIndices(c) { 
@@ -370,7 +380,7 @@ try {
 
   function collectCurrentData() {
     const exercises = [];
-    $$('.exercise').forEach(el => {
+    document.querySelectorAll('.exercise').forEach(el => {
       const name = el.querySelector('[data-role="name"]').value.trim();
       const sets = [];
       el.querySelectorAll('.set-row').forEach(row => {
@@ -382,19 +392,19 @@ try {
       });
       exercises.push({ name, sets });
     });
-    return { dayType: $('#dayTypeInput').value, exercises };
+    return { dayType: document.getElementById('dayTypeInput').value, exercises };
   }
 
-  $('#saveBtn').onclick = () => {
-    const date = $('#dateInput').value;
+  document.getElementById('saveBtn').onclick = function() {
+    const date = document.getElementById('dateInput').value;
     const data = loadData();
     data.days[date] = collectCurrentData();
     saveData(data);
     alert('Zapisano!');
   };
 
-  $('#addExerciseBtn').onclick = () => addExerciseElement();
-  $('#dateInput').onchange = (e) => loadDay(e.target.value);
+  document.getElementById('addExerciseBtn').onclick = function() { addExerciseElement(); };
+  document.getElementById('dateInput').onchange = function(e) { loadDay(e.target.value); };
   
   window.deleteDay = function(date) {
     if(confirm(`Usunąć historię z dnia ${date}?`)) {
@@ -402,10 +412,13 @@ try {
       delete d.days[date];
       saveData(d);
       renderSidebarHistory();
-      if($('#dateInput').value === date) $('#exercisesList').innerHTML = '';
+      if(document.getElementById('dateInput').value === date) {
+        document.getElementById('exercisesList').innerHTML = '';
+      }
     }
   }
 
+  // --- GAMIFICATION ---
   function calcGamification() {
     const data = loadData();
     let totalVol = 0;
@@ -440,15 +453,15 @@ try {
       }
     }
 
-    $('#rankName').textContent = currentRank.name;
-    $('#streakCount').textContent = streak;
+    document.getElementById('rankName').textContent = currentRank.name;
+    document.getElementById('streakCount').textContent = streak;
     const xpPerc = Math.min(100, Math.max(0, ((totalVol-currentRank.min)/(nextRank.min-currentRank.min))*100));
-    $('#xpBar').style.width = xpPerc + '%';
-    $('#nextRankTarget').textContent = (nextRank.min - totalVol).toLocaleString();
+    document.getElementById('xpBar').style.width = xpPerc + '%';
+    document.getElementById('nextRankTarget').textContent = (nextRank.min - totalVol).toLocaleString();
   }
 
   function renderSidebarHistory() {
-    const list = $('#sidebarHistoryList');
+    const list = document.getElementById('sidebarHistoryList');
     list.innerHTML = '';
     const data = loadData();
     Object.keys(data.days).sort((a,b)=>new Date(b)-new Date(a)).forEach(d => {
@@ -465,29 +478,29 @@ try {
     });
   }
 
-  // FEATURES
+  // --- FEATURES ---
   let timerInt, timeLeft=120;
   window.startAutoTimer = function() {
     clearInterval(timerInt); timeLeft=120;
-    $('#timerBar').classList.add('active'); updateTimer();
-    timerInt = setInterval(() => { timeLeft--; updateTimer(); if(timeLeft<=0) stopTimer(); }, 1000);
+    document.getElementById('timerBar').classList.add('active'); updateTimer();
+    timerInt = setInterval(function() { timeLeft--; updateTimer(); if(timeLeft<=0) window.stopTimer(); }, 1000);
   }
-  window.stopTimer = function() { clearInterval(timerInt); $('#timerBar').classList.remove('active'); }
+  window.stopTimer = function() { clearInterval(timerInt); document.getElementById('timerBar').classList.remove('active'); }
   window.addTime = function(s) { timeLeft+=s; updateTimer(); }
-  function updateTimer() { $('#timerDisplay').textContent = `${Math.floor(timeLeft/60).toString().padStart(2,'0')}:${(timeLeft%60).toString().padStart(2,'0')}`; }
+  function updateTimer() { document.getElementById('timerDisplay').textContent = `${Math.floor(timeLeft/60).toString().padStart(2,'0')}:${(timeLeft%60).toString().padStart(2,'0')}`; }
 
   window.calc1RM = function() {
-    const w = Number($('#rmWeight').value);
-    const r = Number($('#rmReps').value);
+    const w = Number(document.getElementById('rmWeight').value);
+    const r = Number(document.getElementById('rmReps').value);
     if(w && r) {
       const max = Math.round(w * (36 / (37 - r)));
-      $('#rmResult').textContent = max + " kg";
+      document.getElementById('rmResult').textContent = max + " kg";
     }
   }
 
   window.renderWeightUI = function() {
     const d = loadData();
-    const list = $('#weightHistoryList');
+    const list = document.getElementById('weightHistoryList');
     list.innerHTML = '';
     const history = d.weightHistory.sort((a,b)=>new Date(b.date)-new Date(a.date));
     history.forEach(item => {
@@ -500,19 +513,19 @@ try {
       const chartData = history.slice(0, 10).reverse().map(h => h.weight);
       drawSimpleChart('weightChartWrapper', chartData, history.slice(0,10).reverse().map(h=>h.date.slice(5)));
     } else {
-      $('#weightChartWrapper').innerHTML = '<div style="text-align:center; padding-top:40px; color:#666">Dodaj min. 2 wpisy</div>';
+      document.getElementById('weightChartWrapper').innerHTML = '<div style="text-align:center; padding-top:40px; color:#666">Dodaj min. 2 wpisy</div>';
     }
   }
 
   window.addWeight = function() {
-    const val = Number($('#weightInput').value);
+    const val = Number(document.getElementById('weightInput').value);
     if(val) {
       const d = loadData();
       const today = new Date().toISOString().slice(0,10);
       d.weightHistory = d.weightHistory.filter(h => h.date !== today);
       d.weightHistory.push({ date: today, weight: val });
       saveData(d);
-      $('#weightInput').value = '';
+      document.getElementById('weightInput').value = '';
       renderWeightUI();
     }
   }
@@ -526,7 +539,7 @@ try {
   }
 
   window.initChartSelect = function() {
-    const sel = $('#chartExerciseSelect');
+    const sel = document.getElementById('chartExerciseSelect');
     sel.innerHTML = '<option value="">Wybierz ćwiczenie...</option>';
     const d = loadData();
     const names = new Set();
@@ -557,7 +570,7 @@ try {
     if(points.length > 1) {
       drawSimpleChart('chartWrapper', points.map(p=>p.val), points.map(p=>p.date));
     } else {
-      $('#chartWrapper').innerHTML = '<div style="padding-top:40px">Za mało danych<br>(min. 2 treningi z tym ćwiczeniem)</div>';
+      document.getElementById('chartWrapper').innerHTML = '<div style="padding-top:40px">Za mało danych<br>(min. 2 treningi z tym ćwiczeniem)</div>';
     }
   }
 
@@ -570,7 +583,7 @@ try {
 
     const max = Math.max(...data) * 1.1;
     const min = Math.min(...data) * 0.9;
-    const range = max - min || 1; // Prevent div by zero
+    const range = max - min || 1; 
 
     const getX = (i) => {
         const den = data.length - 1 || 1;
@@ -602,7 +615,33 @@ try {
 
   window.exportData = function() {
      const b = new Blob([JSON.stringify(loadData())], {type: "application/json"});
-     const a = document.createElement('a'); a.href=URL.createObjectURL(b); a.download="gym_v4_fix.json"; a.click();
+     const a = document.createElement('a'); a.href=URL.createObjectURL(b); a.download="gym_backup.json"; a.click();
+  };
+
+  // FUNKCJA IMPORTU
+  window.importData = function(input) {
+    const file = input.files[0];
+    if(!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        if(data.days || data.weightHistory) {
+          if(confirm('To nadpisze obecne dane. Kontynuować?')) {
+            saveData(data);
+            alert('Dane wczytane!');
+            location.reload();
+          }
+        } else {
+          alert('Błędny plik.');
+        }
+      } catch(err) {
+        alert('Błąd: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    input.value = '';
   };
 
   // INIT
