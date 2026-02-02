@@ -960,60 +960,554 @@ try {
         svgHTML += '<polyline points="" d="'+dPath+'" />';
 
         data.forEach(function(val, i) {
-          const x = getX(i);
-          const y = getY(val);
-          svgHTML += '<circle cx="'+x+'" cy="'+y+'" r="4" />';
-          svgHTML += '<text x="'+x+'" y="'+(y-10)+'" fill="#fff" font-size="10" text-anchor="middle">'+val+'</text>';
-          svgHTML += '<text x="'+x+'" y="'+(h-5)+'" fill="#888" font-size="9" text-anchor="middle">'+labels[i]+'</text>';
-        });
+<script>
+// --- 1. GLOBALNA OBSŁUGA BŁĘDÓW (NA WSZELKI WYPADEK) ---
+window.onerror = function(msg, url, line) {
+  var bar = document.getElementById('debug-bar');
+  if(bar) {
+    bar.style.display = 'block';
+    document.getElementById('debug-msg').textContent = msg + " (Linia: " + line + ")";
+  }
+  return false;
+};
+
+// --- 2. KONFIGURACJA I ZMIENNE GLOBALNE ---
+var STORAGE_KEY = 'eryk_gym_final_v3';
+var timerInt = null;
+var timeLeft = 120;
+
+var RANKS = [
+  { name: 'Świeżak', min: 0 },
+  { name: 'Debiutant', min: 5000 },
+  { name: 'Początkujący', min: 15000 },
+  { name: 'Bywalec', min: 30000 },
+  { name: 'Zapaleniec', min: 60000 },
+  { name: 'Amator', min: 100000 },
+  { name: 'Pasjonat', min: 200000 },
+  { name: 'Średniozaawansowany', min: 350000 },
+  { name: 'Koks', min: 500000 },
+  { name: 'Kulturysta', min: 750000 },
+  { name: 'Dzik', min: 1000000 },
+  { name: 'Bestia', min: 1500000 },
+  { name: 'Goliat', min: 2500000 },
+  { name: 'Tytan', min: 3500000 },
+  { name: 'Król Żelastwa', min: 5000000 }
+];
+
+// --- 3. FUNKCJE BAZOWE (POZA BLOKAMI TRY/CATCH) ---
+
+function loadData() {
+  try {
+    var str = localStorage.getItem(STORAGE_KEY);
+    var d = str ? JSON.parse(str) : {};
+    if(!d.days) d.days = {};
+    if(!d.notes) d.notes = {};
+    if(!d.weightHistory) d.weightHistory = [];
+    return d;
+  } catch(e) {
+    console.error(e);
+    return { days: {}, notes: {}, weightHistory: [] };
+  }
+}
+
+function saveData(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    calcGamification();
+  } catch(e) {
+    alert("Błąd zapisu (Pamięć pełna lub tryb prywatny): " + e.message);
+  }
+}
+
+// --- 4. FUNKCJE UI (MENU, MODALE) ---
+
+function toggleSidebar() { 
+  document.getElementById('sidebar').classList.add('open'); 
+  document.getElementById('overlay').classList.add('open');
+  renderSidebarHistory(); 
+  calcGamification();
+}
+
+function closeAll() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  var modals = document.querySelectorAll('.modal');
+  for(var i=0; i<modals.length; i++) {
+    modals[i].classList.remove('open');
+  }
+}
+
+function openModal(id) {
+  closeAll();
+  document.getElementById('overlay').classList.add('open');
+  var m = document.getElementById(id);
+  if(m) m.classList.add('open');
+  if(id === 'chartModal') initChartSelect();
+  if(id === 'weightModal') renderWeightUI();
+}
+
+// --- 5. LOGIKA ĆWICZEŃ ---
+
+function loadDay(date) {
+  document.getElementById('dateInput').value = date;
+  var data = loadData();
+  var dayData = data.days[date];
+  var list = document.getElementById('exercisesList');
+  list.innerHTML = '';
+  
+  if(dayData) {
+    document.getElementById('dayTypeInput').value = dayData.dayType;
+    if(dayData.exercises) {
+      for(var i=0; i<dayData.exercises.length; i++) {
+        var ex = dayData.exercises[i];
+        addExerciseElement(ex.name, ex.sets);
+      }
+    }
+  }
+}
+
+function addExerciseElement(name, sets) {
+  if(!name) name = '';
+  if(!sets) sets = [];
+
+  var tpl = document.getElementById('exerciseTemplate').content.cloneNode(true);
+  var el = tpl.querySelector('.exercise');
+  document.getElementById('exercisesList').appendChild(el);
+
+  var nameInput = el.querySelector('[data-role="name"]');
+  var noteInput = el.querySelector('[data-role="note"]');
+  nameInput.value = name;
+
+  // Ładowanie notatki
+  var data = loadData();
+  if(name && data.notes[name]) noteInput.value = data.notes[name];
+
+  // Zapis notatki
+  noteInput.addEventListener('input', function() {
+    var n = nameInput.value.trim();
+    if(n) {
+      var d = loadData();
+      d.notes[n] = noteInput.value;
+      saveData(d);
+    }
+  });
+  
+  var setsContainer = el.querySelector('[data-role="sets"]');
+  
+  // Funkcja renderująca serię
+  function renderSet(w, r, isDone) {
+    if(!w) w = ''; if(!r) r = ''; 
+
+    var sTpl = document.getElementById('setRowTemplate').content.cloneNode(true);
+    var row = sTpl.querySelector('.set-row');
+    var checkBtn = row.querySelector('[data-role="check"]');
+    
+    row.querySelector('[data-role="weight"]').value = w;
+    row.querySelector('[data-role="reps"]').value = r;
+    
+    if(isDone) { 
+      row.classList.add('done'); 
+      checkBtn.classList.add('checked'); 
     }
     
-    svgHTML += '</svg>';
-    c.innerHTML = svgHTML;
+    checkBtn.onclick = function() {
+      var nowDone = row.classList.toggle('done');
+      checkBtn.classList.toggle('checked');
+      if(nowDone) startAutoTimer();
+    };
+    
+    setsContainer.appendChild(row);
+    updateIndices(setsContainer);
   }
 
-  window.exportData = function() {
-     const b = new Blob([JSON.stringify(loadData())], {type: "application/json"});
-     const a = document.createElement('a'); 
-     a.href=URL.createObjectURL(b); 
-     a.download="gym_backup.json"; 
-     a.click();
+  if(sets.length > 0) {
+    for(var j=0; j<sets.length; j++) {
+      renderSet(sets[j].weight, sets[j].reps, sets[j].done);
+    }
+  } else {
+    for(var k=0; k<3; k++) renderSet();
+  }
+
+  el.querySelector('[data-role="addSet"]').onclick = function() {
+     var last = setsContainer.lastElementChild;
+     var val = '';
+     if(last) val = last.querySelector('[data-role="weight"]').value;
+     renderSet(val, '');
   };
-
-  window.importData = function(input) {
-    const file = input.files[0];
-    if(!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const data = JSON.parse(e.target.result);
-        if(data.days || data.weightHistory) {
-          if(confirm('To nadpisze obecne dane. Kontynuować?')) {
-            saveData(data);
-            alert('Dane wczytane!');
-            location.reload();
-          }
-        } else {
-          alert('Błędny plik.');
-        }
-      } catch(err) {
-        alert('Błąd: ' + err.message);
-      }
-    };
-    reader.readAsText(file);
-    input.value = '';
+  
+  el.querySelector('[data-role="removeEx"]').onclick = function() { 
+    if(confirm('Usunąć ćwiczenie?')) el.remove(); 
   };
-
-  // INIT
-  const today = new Date().toISOString().slice(0,10);
-  loadDay(today);
-  calcGamification();
-
-} catch (err) {
-  document.getElementById('debug-bar').style.display = 'block';
-  document.getElementById('debug-msg').textContent = err.message;
 }
+
+function updateIndices(container) { 
+  var rows = container.children;
+  for(var i=0; i<rows.length; i++) {
+    var idx = rows[i].querySelector('[data-role="idx"]');
+    if(idx) idx.textContent = (i+1);
+  }
+}
+
+// ZAPIS TRENINGU
+document.getElementById('saveBtn').onclick = function() {
+  var date = document.getElementById('dateInput').value;
+  var exercises = [];
+  
+  var exEls = document.querySelectorAll('.exercise');
+  for(var i=0; i<exEls.length; i++) {
+    var el = exEls[i];
+    var name = el.querySelector('[data-role="name"]').value.trim();
+    var setRows = el.querySelectorAll('.set-row');
+    var sets = [];
+    
+    for(var j=0; j<setRows.length; j++) {
+      var row = setRows[j];
+      sets.push({
+        weight: row.querySelector('[data-role="weight"]').value,
+        reps: row.querySelector('[data-role="reps"]').value,
+        done: row.classList.contains('done')
+      });
+    }
+    exercises.push({ name: name, sets: sets });
+  }
+
+  var data = loadData();
+  data.days[date] = { 
+    dayType: document.getElementById('dayTypeInput').value, 
+    exercises: exercises 
+  };
+  saveData(data);
+  alert('Zapisano!');
+};
+
+// PRZYCISKI GŁÓWNE
+document.getElementById('addExerciseBtn').onclick = function() { addExerciseElement(); };
+document.getElementById('dateInput').onchange = function(e) { loadDay(e.target.value); };
+
+// USUWANIE DNIA
+function deleteDay(date) {
+  if(confirm('Usunąć historię z dnia ' + date + '?')) {
+    var d = loadData();
+    delete d.days[date];
+    saveData(d);
+    renderSidebarHistory();
+    if(document.getElementById('dateInput').value === date) {
+      document.getElementById('exercisesList').innerHTML = '';
+    }
+  }
+}
+
+// --- 6. GRYWALIZACJA ---
+
+function calcGamification() {
+  var data = loadData();
+  var totalVol = 0;
+  var allDates = Object.keys(data.days).sort();
+  var todayStr = new Date().toISOString().slice(0,10);
+
+  for(var i=0; i<allDates.length; i++) {
+    var d = allDates[i];
+    if(data.days[d] && data.days[d].exercises) {
+      var exList = data.days[d].exercises;
+      for(var j=0; j<exList.length; j++) {
+        var sList = exList[j].sets;
+        for(var k=0; k<sList.length; k++) {
+          totalVol += (Number(sList[k].weight||0) * Number(sList[k].reps||0));
+        }
+      }
+    }
+  }
+
+  var currentRank = RANKS[0];
+  var nextRank = RANKS[1];
+
+  for(var r=0; r<RANKS.length; r++) {
+    if(totalVol >= RANKS[r].min) { 
+        currentRank = RANKS[r]; 
+        nextRank = RANKS[r+1] || { min: totalVol*1.5 }; 
+    }
+  }
+
+  // Streak
+  var streak = 0;
+  var validDates = [];
+  for(var dIdx=0; dIdx<allDates.length; dIdx++) {
+    var dateKey = allDates[dIdx];
+    if(dateKey <= todayStr && data.days[dateKey].exercises.length > 0) {
+      validDates.push(dateKey);
+    }
+  }
+  
+  if(validDates.length > 0) {
+    var lastDate = new Date(validDates[validDates.length-1]);
+    var todayDate = new Date(todayStr);
+    var diffTime = Math.abs(todayDate - lastDate);
+    var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    
+    if(diffDays <= 1) {
+      streak = 1;
+      for(var v=validDates.length-2; v>=0; v--) {
+        var d1 = new Date(validDates[v]);
+        var d2 = new Date(validDates[v+1]);
+        var gap = (d2 - d1) / (1000 * 3600 * 24);
+        if(Math.round(gap) === 1) streak++; else if(Math.round(gap) > 1) break;
+      }
+    }
+  }
+
+  document.getElementById('rankName').textContent = currentRank.name;
+  document.getElementById('streakCount').textContent = streak;
+  
+  var xpPerc = 0;
+  if(nextRank.min > currentRank.min) {
+      xpPerc = Math.min(100, Math.max(0, ((totalVol-currentRank.min)/(nextRank.min-currentRank.min))*100));
+  }
+  document.getElementById('xpBar').style.width = xpPerc + '%';
+  document.getElementById('nextRankTarget').textContent = (nextRank.min - totalVol).toLocaleString();
+}
+
+function renderSidebarHistory() {
+  var list = document.getElementById('sidebarHistoryList');
+  list.innerHTML = '';
+  var data = loadData();
+  var keys = Object.keys(data.days).sort(function(a,b){ return new Date(b)-new Date(a); });
+  
+  for(var i=0; i<keys.length; i++) {
+    var d = keys[i];
+    var div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerHTML = 
+      '<div onclick="loadDay(\''+d+'\'); closeAll()" style="flex:1">' +
+        '<b>'+d+'</b> <span class="tag '+data.days[d].dayType+'">'+data.days[d].dayType+'</span>' +
+        '<div style="font-size:11px; color:#aaa">'+data.days[d].exercises.length+' ćw.</div>' +
+      '</div>' +
+      '<button style="background:none; border:none; color:var(--danger); font-size:16px; padding:5px" onclick="deleteDay(\''+d+'\')">🗑️</button>';
+    list.appendChild(div);
+  }
+}
+
+// --- 7. TIMER & DODATKI ---
+
+function startAutoTimer() {
+  if(timerInt) clearInterval(timerInt);
+  timeLeft = 120;
+  document.getElementById('timerBar').classList.add('active'); 
+  updateTimer();
+  timerInt = setInterval(function() { 
+      timeLeft--; 
+      updateTimer(); 
+      if(timeLeft<=0) stopTimer(); 
+  }, 1000);
+}
+
+function stopTimer() { 
+    if(timerInt) clearInterval(timerInt); 
+    document.getElementById('timerBar').classList.remove('active'); 
+}
+
+function addTime(s) { timeLeft+=s; updateTimer(); }
+
+function updateTimer() { 
+    var m = Math.floor(timeLeft/60).toString().padStart(2,'0');
+    var s = (timeLeft%60).toString().padStart(2,'0');
+    document.getElementById('timerDisplay').textContent = m + ':' + s;
+}
+
+// EXPORT / IMPORT / 1RM / WEIGHT
+function exportData() {
+   var b = new Blob([JSON.stringify(loadData())], {type: "application/json"});
+   var a = document.createElement('a'); 
+   a.href=URL.createObjectURL(b); 
+   a.download="gym_backup.json"; 
+   a.click();
+}
+
+function importData(input) {
+  var file = input.files[0];
+  if(!file) return;
+  
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if(data.days || data.weightHistory) {
+        if(confirm('To nadpisze obecne dane. Kontynuować?')) {
+          saveData(data);
+          alert('Dane wczytane!');
+          location.reload();
+        }
+      } else {
+        alert('Błędny plik.');
+      }
+    } catch(err) {
+      alert('Błąd: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function calc1RM() {
+  var w = Number(document.getElementById('rmWeight').value);
+  var r = Number(document.getElementById('rmReps').value);
+  if(w && r) {
+    var max = Math.round(w * (36 / (37 - r)));
+    document.getElementById('rmResult').textContent = max + " kg";
+  }
+}
+
+function renderWeightUI() {
+  var d = loadData();
+  var list = document.getElementById('weightHistoryList');
+  list.innerHTML = '';
+  var history = d.weightHistory.sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+  
+  for(var i=0; i<history.length; i++) {
+    var item = history[i];
+    var row = document.createElement('div');
+    row.style.padding = "8px"; 
+    row.style.borderBottom="1px solid #333"; 
+    row.style.display="flex"; 
+    row.style.justifyContent="space-between";
+    row.innerHTML = '<span>'+item.date+'</span> <b>'+item.weight+' kg</b> <span style="color:red; cursor:pointer" onclick="delWeight(\''+item.date+'\')">✕</span>';
+    list.appendChild(row);
+  }
+  
+  if(history.length > 1) {
+    var chartData = history.slice(0, 10).reverse().map(function(h){ return h.weight; });
+    var chartLabels = history.slice(0,10).reverse().map(function(h){ return h.date.slice(5); });
+    drawSimpleChart('weightChartWrapper', chartData, chartLabels);
+  } else {
+    document.getElementById('weightChartWrapper').innerHTML = '<div style="text-align:center; padding-top:40px; color:#666">Dodaj min. 2 wpisy</div>';
+  }
+}
+
+function addWeight() {
+  var val = Number(document.getElementById('weightInput').value);
+  if(val) {
+    var d = loadData();
+    var today = new Date().toISOString().slice(0,10);
+    d.weightHistory = d.weightHistory.filter(function(h) { return h.date !== today; });
+    d.weightHistory.push({ date: today, weight: val });
+    saveData(d);
+    document.getElementById('weightInput').value = '';
+    renderWeightUI();
+  }
+}
+
+function delWeight(date) {
+   if(confirm('Usunąć wpis wagi?')) {
+     var d = loadData();
+     d.weightHistory = d.weightHistory.filter(function(h) { return h.date !== date; });
+     saveData(d); renderWeightUI();
+   }
+}
+
+function initChartSelect() {
+  var sel = document.getElementById('chartExerciseSelect');
+  sel.innerHTML = '<option value="">Wybierz ćwiczenie...</option>';
+  var d = loadData();
+  var names = new Set();
+  
+  var keys = Object.keys(d.days);
+  for(var i=0; i<keys.length; i++) {
+    var day = d.days[keys[i]];
+    if(day.exercises) {
+        for(var j=0; j<day.exercises.length; j++) {
+            names.add(day.exercises[j].name);
+        }
+    }
+  }
+  
+  names.forEach(function(n) {
+    if(n) { 
+        var opt = document.createElement('option'); 
+        opt.value = n; 
+        opt.textContent = n; 
+        sel.appendChild(opt); 
+    }
+  });
+}
+
+function renderChart(exName) {
+  if(!exName) return;
+  var d = loadData();
+  var points = [];
+  var sortedKeys = Object.keys(d.days).sort();
+  
+  for(var i=0; i<sortedKeys.length; i++) {
+    var date = sortedKeys[i];
+    var day = d.days[date];
+    if(day.exercises) {
+      var ex = null;
+      for(var j=0; j<day.exercises.length; j++) {
+         if(day.exercises[j].name === exName) { ex = day.exercises[j]; break; }
+      }
+      
+      if(ex) {
+          var maxW = 0;
+          for(var k=0; k<ex.sets.length; k++) {
+              if(Number(ex.sets[k].weight) > maxW) maxW = Number(ex.sets[k].weight);
+          }
+          if(maxW > 0) points.push({ date: date.slice(5), val: maxW });
+      }
+    }
+  }
+
+  if(points.length > 1) {
+    var vals = points.map(function(p){ return p.val; });
+    var labs = points.map(function(p){ return p.date; });
+    drawSimpleChart('chartWrapper', vals, labs);
+  } else {
+    document.getElementById('chartWrapper').innerHTML = '<div style="padding-top:40px">Za mało danych<br>(min. 2 treningi z tym ćwiczeniem)</div>';
+  }
+}
+
+function drawSimpleChart(containerId, data, labels) {
+  var c = document.getElementById(containerId);
+  c.innerHTML = '';
+  var w = c.clientWidth || 300;
+  var h = 150; 
+  var pad = 20;
+
+  var max = Math.max.apply(null, data) * 1.1;
+  var min = Math.min.apply(null, data) * 0.9;
+  var range = max - min || 1; 
+
+  function getX(i) {
+      var den = data.length - 1 || 1;
+      return pad + (i / den) * (w - pad * 2);
+  }
+  function getY(v) { return h - pad - ((v - min) / range) * (h - pad * 2); }
+
+  var svgHTML = '<svg viewBox="0 0 '+w+' '+h+'">';
+  svgHTML += '<line x1="'+pad+'" y1="'+pad+'" x2="'+pad+'" y2="'+(h-pad)+'" stroke="#444" stroke-width="1"/>';
+  svgHTML += '<line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="#444" stroke-width="1"/>';
+
+  if(data.length > 0) {
+      var dPath = 'M ' + getX(0) + ' ' + getY(data[0]) + ' ';
+      for(var i=1; i<data.length; i++) dPath += 'L ' + getX(i) + ' ' + getY(data[i]) + ' ';
+      svgHTML += '<polyline points="" d="'+dPath+'" />';
+
+      for(var j=0; j<data.length; j++) {
+        var x = getX(j);
+        var y = getY(data[j]);
+        svgHTML += '<circle cx="'+x+'" cy="'+y+'" r="4" />';
+        svgHTML += '<text x="'+x+'" y="'+(y-10)+'" fill="#fff" font-size="10" text-anchor="middle">'+data[j]+'</text>';
+        svgHTML += '<text x="'+x+'" y="'+(h-5)+'" fill="#888" font-size="9" text-anchor="middle">'+labels[j]+'</text>';
+      }
+  }
+  
+  svgHTML += '</svg>';
+  c.innerHTML = svgHTML;
+}
+
+// --- 8. START APLIKACJI ---
+var today = new Date().toISOString().slice(0,10);
+document.getElementById('dateInput').value = today;
+loadDay(today);
+calcGamification();
+
 </script>
 </body>
 </html>
