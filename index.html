@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>GymTracker</title>
+  <title>GymTracker 14.0 Persistence</title>
   <style>
     :root{
       /* DOMYŚLNY MOTYW */
       --bg:#0f172a; --card-bg: #1e293b; --text:#e2e8f0; --muted:#94a3b8;
       --accent:#3b82f6; --success:#22c55e; --danger:#ef4444; --warn:#f59e0b;
       --gold: #fbbf24; --purple: #8b5cf6;
-      --row-bg: #0f172a; /* Nowa zmienna dla tła serii */
+      --row-bg: #0f172a;
     }
     *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
     
@@ -30,14 +30,13 @@
       scrollbar-width: none;
       margin-bottom: 10px;
       border-radius: 12px;
-      background: var(--danger); /* To jest czerwone tło pod spodem */
+      background: var(--danger); 
     }
     .swipe-wrapper::-webkit-scrollbar { display: none; }
 
     .set-row {
       min-width: 100%;
       scroll-snap-align: start;
-      /* POPRAWKA: Tło jest teraz solidne (nieprzezroczyste), zasłania czerwień */
       background: var(--row-bg); 
       display: grid; grid-template-columns: 25px 1fr 1fr 44px; gap: 10px; 
       align-items: center; padding: 10px; 
@@ -53,11 +52,7 @@
       background: var(--danger);
     }
 
-    /* RESZTA STYLÓW */
-    .set-row.done { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.5); }
-    /* Gdy seria zrobiona, lekko zielona, ale wciąż musi zasłaniać czerwień, więc używamy gradientu */
-    .set-row.done { background: linear-gradient(to right, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15)), var(--row-bg); }
-
+    .set-row.done { background: linear-gradient(to right, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15)), var(--row-bg); border-color: rgba(34, 197, 94, 0.5); }
     .check-btn { width: 44px; height: 44px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: var(--muted); font-size: 20px; cursor: pointer; display:grid; place-items:center; }
     .check-btn.checked { background: var(--success); color: white; }
     .ghost-text { position: absolute; bottom: 2px; left: 45px; font-size: 10px; color: var(--muted); opacity: 0.7; font-weight: bold; pointer-events: none; white-space: nowrap; }
@@ -328,7 +323,7 @@
 </template>
 
 <script>
-const STORAGE_KEY='eryk_gym_final_v13_1';
+const STORAGE_KEY='eryk_gym_final_v14_1';
 const $=(s)=>document.querySelector(s);
 const $$=(s)=>document.querySelectorAll(s);
 let timerInt=null, timeLeft=120, currentRating=null, workoutStartTime=null, sessionInt=null, autoSaveTimer=null;
@@ -346,8 +341,67 @@ function showCustomAlert(t,x){$('#customModalTitle').textContent=t;$('#customMod
 function showCustomConfirm(t,x,y,cb){$('#customModalTitle').textContent=t;$('#customModalText').textContent=x;$('#customModalButtons').innerHTML=`<button class="btn ghost" onclick="closeAll()">Anuluj</button><button class="btn danger" id="confirmYesBtn">${y}</button>`;document.getElementById('confirmYesBtn').onclick=()=>{cb();closeAll();};openModal('customModal');}
 const getRatingEmoji=(r)=>r==='bad'?'🥵':(r==='good'?'⚡':'🙂');
 
-function startSessionTimer(){if(sessionInt)return;workoutStartTime=Date.now();$('#sessionTimer').classList.add('active');sessionInt=setInterval(()=>{const diff=Math.floor((Date.now()-workoutStartTime)/1000);const h=Math.floor(diff/3600).toString().padStart(2,'0');const m=Math.floor((diff%3600)/60).toString().padStart(2,'0');const s=(diff%60).toString().padStart(2,'0');$('#sessionTimer').textContent=`${h}:${m}:${s}`;},1000);}
-function stopSessionTimer(){clearInterval(sessionInt);sessionInt=null;$('#sessionTimer').classList.remove('active');return $('#sessionTimer').textContent;}
+// PERSISTENCE FIX (TIMER & SESSION)
+function startSessionTimer(){
+  if(sessionInt) return;
+  // Load saved start time or set new
+  const savedStart = localStorage.getItem('gymSessionStart');
+  if(savedStart) workoutStartTime = parseInt(savedStart);
+  else { workoutStartTime = Date.now(); localStorage.setItem('gymSessionStart', workoutStartTime); }
+  
+  $('#sessionTimer').classList.add('active');
+  sessionInt = setInterval(()=>{
+    const diff = Math.floor((Date.now() - workoutStartTime)/1000);
+    const h=Math.floor(diff/3600).toString().padStart(2,'0');
+    const m=Math.floor((diff%3600)/60).toString().padStart(2,'0');
+    const s=(diff%60).toString().padStart(2,'0');
+    $('#sessionTimer').textContent = `${h}:${m}:${s}`;
+  },1000);
+}
+function stopSessionTimer(){ return $('#sessionTimer').textContent; } // Don't clear interval here to keep UI updating until "Finish"
+
+function startAutoTimer(){
+  // Load saved rest target or set new
+  const savedTarget = localStorage.getItem('gymRestTarget');
+  let targetTime;
+  
+  if(savedTarget && parseInt(savedTarget) > Date.now()) {
+    targetTime = parseInt(savedTarget);
+  } else {
+    targetTime = Date.now() + 120000; // 2 min
+    localStorage.setItem('gymRestTarget', targetTime);
+  }
+
+  clearInterval(timerInt);
+  $('#timerBar').classList.add('active');
+  
+  const updateTick = () => {
+    const now = Date.now();
+    timeLeft = Math.ceil((targetTime - now)/1000);
+    if(timeLeft <= 0) {
+      clearInterval(timerInt);
+      localStorage.removeItem('gymRestTarget');
+      $('#timerBar').classList.remove('active');
+      if(navigator.vibrate) navigator.vibrate([500,200,500]); 
+      playBeep(1200,600,'square');
+    } else {
+      updateTimerDisplay();
+    }
+  };
+  
+  updateTick(); // Run immediately
+  timerInt = setInterval(updateTick, 1000);
+}
+
+function stopTimer(){ clearInterval(timerInt); localStorage.removeItem('gymRestTarget'); $('#timerBar').classList.remove('active'); }
+function addTime(s){ 
+  const currentTarget = parseInt(localStorage.getItem('gymRestTarget')) || (Date.now() + timeLeft*1000);
+  const newTarget = currentTarget + (s*1000);
+  localStorage.setItem('gymRestTarget', newTarget);
+  // Timer interval will pick up the change automatically
+}
+function updateTimerDisplay(){$('#timerDisplay').textContent=`${Math.floor(timeLeft/60).toString().padStart(2,'0')}:${(timeLeft%60).toString().padStart(2,'0')}`;}
+
 function getLastPerformance(exName,setIndex){if(!exName)return null;const d=loadData();const dates=Object.keys(d.days).sort().reverse();for(let date of dates){if(d.days[date].exercises){const ex=d.days[date].exercises.find(e=>e.name===exName);if(ex&&ex.sets&&ex.sets[setIndex])return ex.sets[setIndex];}}return null;}
 
 function toggleSidebar(){$('#sidebar').classList.add('open');$('#overlay').classList.add('open');renderSidebarHistory();calcGamification(false);}
@@ -356,7 +410,20 @@ function openModal(id){closeAll();$('#overlay').classList.add('open');document.g
 function setRating(r,btn){currentRating=r;$$('.rating-btn').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');triggerAutoSave();}
 
 function getBestVolume(n){if(!n)return 0;const d=loadData();let m=0;Object.values(d.days).forEach(day=>{if(day.exercises)day.exercises.forEach(ex=>{if(ex.name===n)ex.sets.forEach(s=>{let v=(Number(s.weight)||0)*(Number(s.reps)||0);if(v>m)m=v;});});});return m;}
-function loadDay(date){$('#dateInput').value=date;const data=loadData();const dayData=data.days[date];$('#exercisesList').innerHTML='';if(dayData){$('#dayTypeInput').value=dayData.dayType;if(dayData.exercises)dayData.exercises.forEach(ex=>addExerciseElement(ex.name,ex.sets));if(dayData.rating)setRating(dayData.rating,$(`.rating-btn[onclick*="'${dayData.rating}'"]`));else setRating(null);}else setRating(null);checkSmartLoad();}
+function loadDay(date){
+  $('#dateInput').value=date;const data=loadData();const dayData=data.days[date];$('#exercisesList').innerHTML='';
+  if(dayData){
+    $('#dayTypeInput').value=dayData.dayType;
+    if(dayData.exercises)dayData.exercises.forEach(ex=>addExerciseElement(ex.name,ex.sets));
+    if(dayData.rating)setRating(dayData.rating,$(`.rating-btn[onclick*="'${dayData.rating}'"]`));else setRating(null);
+  } else setRating(null);
+  checkSmartLoad();
+  
+  // Check for ongoing session
+  if(localStorage.getItem('gymSessionStart')) startSessionTimer();
+  // Check for ongoing rest
+  if(localStorage.getItem('gymRestTarget')) startAutoTimer();
+}
 
 function addExerciseElement(name='',sets=[]){
   startSessionTimer();
@@ -395,7 +462,18 @@ function addExerciseElement(name='',sets=[]){
 
 function updateIndices(c){Array.from(c.children).forEach((wrap,i)=>{wrap.querySelector('[data-role="idx"]').textContent=i+1;});}
 function collectCurrentData(){const exercises=[];$$('.exercise').forEach(el=>{const name=el.querySelector('[data-role="name"]').value.trim();const sets=[];el.querySelectorAll('.set-row').forEach(row=>{sets.push({weight:row.querySelector('[data-role="weight"]').value,reps:row.querySelector('[data-role="reps"]').value,done:row.classList.contains('done')});});exercises.push({name,sets});});return{dayType:$('#dayTypeInput').value,exercises,rating:currentRating,duration:stopSessionTimer()};}
-$('#saveBtn').onclick=()=>{triggerAutoSave();showCustomAlert('Trening Zakończony','Wszystko zapisane.');setRating(null);};
+
+$('#saveBtn').onclick=()=>{
+  triggerAutoSave(); 
+  // CLEAR PERSISTENCE
+  clearInterval(sessionInt); sessionInt=null;
+  localStorage.removeItem('gymSessionStart');
+  localStorage.removeItem('gymRestTarget');
+  $('#sessionTimer').classList.remove('active'); $('#timerBar').classList.remove('active');
+  
+  showCustomAlert('Trening Zakończony','Wszystko zapisane.');setRating(null);
+};
+
 $('#addExerciseBtn').onclick=()=>addExerciseElement(); $('#dateInput').onchange=(e)=>loadDay(e.target.value);
 function deleteDay(date){showCustomConfirm('Usunąć dzień?',`Usunąć trening z ${date}?`,'Usuń',()=>{const d=loadData();delete d.days[date];saveData(d);renderSidebarHistory();if($('#dateInput').value===date)$('#exercisesList').innerHTML='';});}
 function renderHallOfFame(){const d=loadData();const records={};Object.keys(d.days).forEach(date=>{const day=d.days[date];if(day.exercises){day.exercises.forEach(ex=>{ex.sets.forEach(s=>{const w=Number(s.weight);if(w>0){if(!records[ex.name]||w>records[ex.name].weight){records[ex.name]={weight:w,date:date};}}});});}});const list=document.getElementById('hofList');list.innerHTML='';const sortedNames=Object.keys(records).sort();if(sortedNames.length===0){list.innerHTML='<div style="text-align:center;color:var(--muted);margin-top:20px">Brak rekordów. Trenuj!</div>';return;}sortedNames.forEach(name=>{const rec=records[name];const div=document.createElement('div');div.className='hof-item';div.innerHTML=`<div><div style="font-weight:bold;font-size:15px;color:var(--text)">${name}</div><div style="font-size:12px;color:var(--muted)">${rec.date}</div></div><div class="hof-weight">${rec.weight} kg</div>`;list.appendChild(div);});}
@@ -404,10 +482,6 @@ function renderSidebarHistory(){const list=$('#sidebarHistoryList');list.innerHT
 function calcPlates(){const t=Number($('#plateWeight').value);const c=$('#plateVisuals');const tx=$('#plateResultText');c.innerHTML='<div class="bar-end"></div>';if(!t||t<20){tx.textContent="0 kg";return;}let s=(t-20)/2;tx.textContent=s+" kg";const p=[25,20,15,10,5,2.5,1.25];const cl=['p-25','p-20','p-15','p-10','p-5','p-2-5','p-1-25'];p.forEach((w,i)=>{while(s>=w){s-=w;const d=document.createElement('div');d.className='plate '+cl[i];d.textContent=w;c.appendChild(d);s=Math.round(s*100)/100;}});}
 function checkSmartLoad(){const t=$('#dayTypeInput').value;const l=$('#exercisesList');if(l.children.length===0){const d=loadData();let h=false;Object.values(d.days).forEach(day=>{if(day.dayType===t)h=true;});if(h)$('#smartLoadContainer').style.display='block';else $('#smartLoadContainer').style.display='none';}else{$('#smartLoadContainer').style.display='none';}}
 function smartLoadWorkout(){const t=$('#dayTypeInput').value;const d=loadData();const ds=Object.keys(d.days).sort().reverse();let f=null;for(let dt of ds){if(d.days[dt].dayType===t){f=d.days[dt];break;}}if(f&&f.exercises){$('#exercisesList').innerHTML='';f.exercises.forEach(ex=>{const s=ex.sets.map(st=>({weight:st.weight,reps:st.reps,done:false}));addExerciseElement(ex.name,s);});showCustomAlert('Wczytano!',`Załadowano ostatni ${t}.`);$('#smartLoadContainer').style.display='none';triggerAutoSave();}}
-function startAutoTimer(){clearInterval(timerInt);timeLeft=120;$('#timerBar').classList.add('active');updateTimer();timerInt=setInterval(()=>{timeLeft--;updateTimer();if(timeLeft<=3&&timeLeft>0&&navigator.vibrate)navigator.vibrate(200);if(timeLeft<=0){stopTimer();if(navigator.vibrate)navigator.vibrate([500,200,500]);playBeep(1200,600,'square');}},1000);}
-function stopTimer(){clearInterval(timerInt);$('#timerBar').classList.remove('active');}
-function addTime(s){timeLeft+=s;updateTimer();}
-function updateTimer(){$('#timerDisplay').textContent=`${Math.floor(timeLeft/60).toString().padStart(2,'0')}:${(timeLeft%60).toString().padStart(2,'0')}`;}
 function exportData(){const b=new Blob([JSON.stringify(loadData())],{type:"application/json"});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download="gym_backup.json";a.click();}
 function importData(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=function(e){try{const d=JSON.parse(e.target.result);if(d.days||d.weightHistory){showCustomConfirm('Nadpisać?','To zastąpi dane.','Tak',()=>{saveData(d);showCustomAlert('Gotowe!','Wczytano.');setTimeout(()=>location.reload(),1500);});}else showCustomAlert('Błąd','Zły plik.');}catch(err){showCustomAlert('Błąd',err.message);}};r.readAsText(f);i.value='';}
 function calc1RM(){const w=Number($('#rmWeight').value);const r=Number($('#rmReps').value);if(w&&r)$('#rmResult').textContent=Math.round(w*(36/(37-r)))+" kg";}
