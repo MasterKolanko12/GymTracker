@@ -3,10 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>GymTracker 14.0 Persistence</title>
+  <title>GymTracker 14.1 Final</title>
   <style>
     :root{
-      /* DOMYŚLNY MOTYW */
       --bg:#0f172a; --card-bg: #1e293b; --text:#e2e8f0; --muted:#94a3b8;
       --accent:#3b82f6; --success:#22c55e; --danger:#ef4444; --warn:#f59e0b;
       --gold: #fbbf24; --purple: #8b5cf6;
@@ -39,7 +38,7 @@
       scroll-snap-align: start;
       background: var(--row-bg); 
       display: grid; grid-template-columns: 25px 1fr 1fr 44px; gap: 10px; 
-      align-items: center; padding: 10px; 
+      align-items: center; padding: 12px 10px; /* Zwiększony padding góra/dół */
       position: relative; border: 1px solid rgba(255,255,255,0.05);
       z-index: 2;
     }
@@ -55,8 +54,23 @@
     .set-row.done { background: linear-gradient(to right, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15)), var(--row-bg); border-color: rgba(34, 197, 94, 0.5); }
     .check-btn { width: 44px; height: 44px; border-radius: 12px; border: none; background: rgba(255,255,255,0.1); color: var(--muted); font-size: 20px; cursor: pointer; display:grid; place-items:center; }
     .check-btn.checked { background: var(--success); color: white; }
+    
+    /* POPRAWIONY GHOST I PR BADGE */
     .ghost-text { position: absolute; bottom: 2px; left: 45px; font-size: 10px; color: var(--muted); opacity: 0.7; font-weight: bold; pointer-events: none; white-space: nowrap; }
-    .pr-badge { position: absolute; right: 55px; top: -8px; background: var(--gold); color: #000; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 8px; box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); display: none; z-index: 10; animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    
+    /* FIX: PR BADGE wewnątrz ramki, żeby go nie ucinało */
+    .pr-badge { 
+      position: absolute; 
+      top: 2px; /* Zamiast -8px */
+      right: 50px; /* Obok przycisku check */
+      background: var(--gold); color: #000; 
+      font-size: 9px; font-weight: 900; 
+      padding: 2px 5px; border-radius: 6px; 
+      box-shadow: 0 0 5px rgba(251, 191, 36, 0.5); 
+      display: none; z-index: 10; 
+      pointer-events: none;
+      animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); 
+    }
     .pr-badge.show { display: block; }
     @keyframes pop { from{transform:scale(0)} to{transform:scale(1)} }
 
@@ -341,10 +355,8 @@ function showCustomAlert(t,x){$('#customModalTitle').textContent=t;$('#customMod
 function showCustomConfirm(t,x,y,cb){$('#customModalTitle').textContent=t;$('#customModalText').textContent=x;$('#customModalButtons').innerHTML=`<button class="btn ghost" onclick="closeAll()">Anuluj</button><button class="btn danger" id="confirmYesBtn">${y}</button>`;document.getElementById('confirmYesBtn').onclick=()=>{cb();closeAll();};openModal('customModal');}
 const getRatingEmoji=(r)=>r==='bad'?'🥵':(r==='good'?'⚡':'🙂');
 
-// PERSISTENCE FIX (TIMER & SESSION)
 function startSessionTimer(){
   if(sessionInt) return;
-  // Load saved start time or set new
   const savedStart = localStorage.getItem('gymSessionStart');
   if(savedStart) workoutStartTime = parseInt(savedStart);
   else { workoutStartTime = Date.now(); localStorage.setItem('gymSessionStart', workoutStartTime); }
@@ -358,19 +370,13 @@ function startSessionTimer(){
     $('#sessionTimer').textContent = `${h}:${m}:${s}`;
   },1000);
 }
-function stopSessionTimer(){ return $('#sessionTimer').textContent; } // Don't clear interval here to keep UI updating until "Finish"
+function stopSessionTimer(){ return $('#sessionTimer').textContent; }
 
 function startAutoTimer(){
-  // Load saved rest target or set new
   const savedTarget = localStorage.getItem('gymRestTarget');
   let targetTime;
-  
-  if(savedTarget && parseInt(savedTarget) > Date.now()) {
-    targetTime = parseInt(savedTarget);
-  } else {
-    targetTime = Date.now() + 120000; // 2 min
-    localStorage.setItem('gymRestTarget', targetTime);
-  }
+  if(savedTarget && parseInt(savedTarget) > Date.now()) { targetTime = parseInt(savedTarget); } 
+  else { targetTime = Date.now() + 120000; localStorage.setItem('gymRestTarget', targetTime); }
 
   clearInterval(timerInt);
   $('#timerBar').classList.add('active');
@@ -379,17 +385,11 @@ function startAutoTimer(){
     const now = Date.now();
     timeLeft = Math.ceil((targetTime - now)/1000);
     if(timeLeft <= 0) {
-      clearInterval(timerInt);
-      localStorage.removeItem('gymRestTarget');
-      $('#timerBar').classList.remove('active');
-      if(navigator.vibrate) navigator.vibrate([500,200,500]); 
-      playBeep(1200,600,'square');
-    } else {
-      updateTimerDisplay();
-    }
+      clearInterval(timerInt); localStorage.removeItem('gymRestTarget'); $('#timerBar').classList.remove('active');
+      if(navigator.vibrate) navigator.vibrate([500,200,500]); playBeep(1200,600,'square');
+    } else { updateTimerDisplay(); }
   };
-  
-  updateTick(); // Run immediately
+  updateTick();
   timerInt = setInterval(updateTick, 1000);
 }
 
@@ -398,7 +398,6 @@ function addTime(s){
   const currentTarget = parseInt(localStorage.getItem('gymRestTarget')) || (Date.now() + timeLeft*1000);
   const newTarget = currentTarget + (s*1000);
   localStorage.setItem('gymRestTarget', newTarget);
-  // Timer interval will pick up the change automatically
 }
 function updateTimerDisplay(){$('#timerDisplay').textContent=`${Math.floor(timeLeft/60).toString().padStart(2,'0')}:${(timeLeft%60).toString().padStart(2,'0')}`;}
 
@@ -418,10 +417,7 @@ function loadDay(date){
     if(dayData.rating)setRating(dayData.rating,$(`.rating-btn[onclick*="'${dayData.rating}'"]`));else setRating(null);
   } else setRating(null);
   checkSmartLoad();
-  
-  // Check for ongoing session
   if(localStorage.getItem('gymSessionStart')) startSessionTimer();
-  // Check for ongoing rest
   if(localStorage.getItem('gymRestTarget')) startAutoTimer();
 }
 
@@ -463,15 +459,26 @@ function addExerciseElement(name='',sets=[]){
 function updateIndices(c){Array.from(c.children).forEach((wrap,i)=>{wrap.querySelector('[data-role="idx"]').textContent=i+1;});}
 function collectCurrentData(){const exercises=[];$$('.exercise').forEach(el=>{const name=el.querySelector('[data-role="name"]').value.trim();const sets=[];el.querySelectorAll('.set-row').forEach(row=>{sets.push({weight:row.querySelector('[data-role="weight"]').value,reps:row.querySelector('[data-role="reps"]').value,done:row.classList.contains('done')});});exercises.push({name,sets});});return{dayType:$('#dayTypeInput').value,exercises,rating:currentRating,duration:stopSessionTimer()};}
 
+// FINALIZACJA I RESET
 $('#saveBtn').onclick=()=>{
+  // 1. Force Save
   triggerAutoSave(); 
-  // CLEAR PERSISTENCE
+  
+  // 2. Clear Persistence
   clearInterval(sessionInt); sessionInt=null;
   localStorage.removeItem('gymSessionStart');
   localStorage.removeItem('gymRestTarget');
   $('#sessionTimer').classList.remove('active'); $('#timerBar').classList.remove('active');
   
-  showCustomAlert('Trening Zakończony','Wszystko zapisane.');setRating(null);
+  // 3. Clear Screen Logic (Reset)
+  $('#exercisesList').innerHTML = '';
+  setRating(null);
+  $('#sessionTimer').textContent = '00:00:00';
+  
+  // 4. Stop auto-save from triggering on empty list immediately
+  clearTimeout(autoSaveTimer);
+
+  showCustomAlert('Trening Zakończony','Dane zapisane, ekran wyczyszczony. Do jutra! 💪');
 };
 
 $('#addExerciseBtn').onclick=()=>addExerciseElement(); $('#dateInput').onchange=(e)=>loadDay(e.target.value);
@@ -482,6 +489,10 @@ function renderSidebarHistory(){const list=$('#sidebarHistoryList');list.innerHT
 function calcPlates(){const t=Number($('#plateWeight').value);const c=$('#plateVisuals');const tx=$('#plateResultText');c.innerHTML='<div class="bar-end"></div>';if(!t||t<20){tx.textContent="0 kg";return;}let s=(t-20)/2;tx.textContent=s+" kg";const p=[25,20,15,10,5,2.5,1.25];const cl=['p-25','p-20','p-15','p-10','p-5','p-2-5','p-1-25'];p.forEach((w,i)=>{while(s>=w){s-=w;const d=document.createElement('div');d.className='plate '+cl[i];d.textContent=w;c.appendChild(d);s=Math.round(s*100)/100;}});}
 function checkSmartLoad(){const t=$('#dayTypeInput').value;const l=$('#exercisesList');if(l.children.length===0){const d=loadData();let h=false;Object.values(d.days).forEach(day=>{if(day.dayType===t)h=true;});if(h)$('#smartLoadContainer').style.display='block';else $('#smartLoadContainer').style.display='none';}else{$('#smartLoadContainer').style.display='none';}}
 function smartLoadWorkout(){const t=$('#dayTypeInput').value;const d=loadData();const ds=Object.keys(d.days).sort().reverse();let f=null;for(let dt of ds){if(d.days[dt].dayType===t){f=d.days[dt];break;}}if(f&&f.exercises){$('#exercisesList').innerHTML='';f.exercises.forEach(ex=>{const s=ex.sets.map(st=>({weight:st.weight,reps:st.reps,done:false}));addExerciseElement(ex.name,s);});showCustomAlert('Wczytano!',`Załadowano ostatni ${t}.`);$('#smartLoadContainer').style.display='none';triggerAutoSave();}}
+function startAutoTimer(){clearInterval(timerInt);timeLeft=120;$('#timerBar').classList.add('active');updateTimer();timerInt=setInterval(()=>{timeLeft--;updateTimer();if(timeLeft<=3&&timeLeft>0&&navigator.vibrate)navigator.vibrate(200);if(timeLeft<=0){stopTimer();if(navigator.vibrate)navigator.vibrate([500,200,500]);playBeep(1200,600,'square');}},1000);}
+function stopTimer(){clearInterval(timerInt);$('#timerBar').classList.remove('active');}
+function addTime(s){timeLeft+=s;updateTimer();}
+function updateTimer(){$('#timerDisplay').textContent=`${Math.floor(timeLeft/60).toString().padStart(2,'0')}:${(timeLeft%60).toString().padStart(2,'0')}`;}
 function exportData(){const b=new Blob([JSON.stringify(loadData())],{type:"application/json"});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download="gym_backup.json";a.click();}
 function importData(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=function(e){try{const d=JSON.parse(e.target.result);if(d.days||d.weightHistory){showCustomConfirm('Nadpisać?','To zastąpi dane.','Tak',()=>{saveData(d);showCustomAlert('Gotowe!','Wczytano.');setTimeout(()=>location.reload(),1500);});}else showCustomAlert('Błąd','Zły plik.');}catch(err){showCustomAlert('Błąd',err.message);}};r.readAsText(f);i.value='';}
 function calc1RM(){const w=Number($('#rmWeight').value);const r=Number($('#rmReps').value);if(w&&r)$('#rmResult').textContent=Math.round(w*(36/(37-r)))+" kg";}
